@@ -162,7 +162,7 @@ Serial.println(currOilPress);
   //int egtRange[] = { 500, 800, 880};
   int currEGT = valueArray[EGT1];
   if ((currEGT <= egtRange[0]) ) {
-    ShiftPWM.SetRGB(0, currBrightness - 10, currBrightness, 0); //yellow
+    ShiftPWM.SetRGB(0, currBrightness, currBrightness, 0); //yellow
   } else  if ((currEGT >= egtRange[2]) ) {
     ShiftPWM.SetRGB(0, currBrightness, 0, 0); //red
   } else {
