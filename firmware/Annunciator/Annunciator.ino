@@ -14,17 +14,17 @@ int currBrightness = 128;
 
 int rpmRange[] = {0, 1440, 1800, 5500, 5800, 5850};
 // Red_end , yellow_begin, green_begin, green_end, yellow_end, red_begin) (1/10 Bar)
-int oilPressRange[] = { 1 , 15 , 15 , 50 , 50 , 70};
-int oilTempRange[] = { 1 , 50 , 90 , 110 , 110 , 140};
+int oilPressRange[] = { 0 , 8 , 20 , 50 , 70};
+int oilTempRange[] = { 1 , 50 , 90 , 110 , 140};
 int egtRange[] = { 500, 800, 880};
 int CHTTempRange[] = {120, 150};
-int fuelPressureRange[] = {40, 150}; // ( 1/100 Bar)
+int fuelPressureRange[] = {15, 40}; // ( 1/100 Bar)
 int fuelLHRange[] = {0, 200, 400};
 int fuelRHRange[] = {0, 200, 400};
 int voltsRange[] = {100, 140};
 
 //*** Settings for FAKE NMEA Decoder ***//
-enum values { RPM, manPress, oilPress, fuelPress, oilTemp, CHT1, CHT2, OAT, fuelLH, fuelRH, fuelFlow, fuelSum, EGT1, EGT2, flaps, volts, amps };
+enum values { RPM=1, manPress, oilPress, fuelPress, oilTemp, CHT1, CHT2, OAT, fuelLH, fuelRH, fuelFlow, fuelSum, EGT1, EGT2, flaps, volts, amps };
 bool dataUpdated = 0;
 int16_t valueArray[20];
 unsigned long lastUpdatedMillis = 0;
@@ -38,7 +38,7 @@ void setup() {
   ShiftPWM.SetAmountOfRegisters(numRegisters);
   ShiftPWM.SetPinGrouping(1);
   ShiftPWM.Start(pwmFrequency, maxBrightness);
-  
+
   // Turn all LED's off.
   ShiftPWM.SetAll(0);
 
@@ -51,6 +51,7 @@ void setup() {
     ShiftPWM.SetRGB(led, 0, 0, currBrightness); // blue
   }
   //End init Shiftregisters
+
 }
 
 
@@ -75,15 +76,15 @@ void loop() {
 
 void setLED() {
   //Set Oil Pressure LED
-  //int oilPressRange[] = { 0 , 15 , 15 , 50 , 50 , 70};
+  //int oilPressRange[] = { 0 , 8 , 20 , 50 , 70};
   int currOilPress = valueArray[oilPress];
-
-  if ((currOilPress < oilPressRange[1] && currOilPress > oilPressRange[0] ) ||  currOilPress > oilPressRange[4]) {
+Serial.println(currOilPress);
+  if (currOilPress <= oilPressRange[1] ||  currOilPress >= oilPressRange[4]) {
     ShiftPWM.SetRGB(7, currBrightness, 0, 0); //red
+  } else if (currOilPress >= oilPressRange[1] &&  currOilPress <= oilPressRange[2]) {
+  ShiftPWM.SetRGB(7, currBrightness, currBrightness, 0 ); //yellow
   } else if (currOilPress >= oilPressRange[2] &&  currOilPress <= oilPressRange[3]) {
     ShiftPWM.SetRGB(7, 0, currBrightness, 0); //green
-  } else {
-    ShiftPWM.SetRGB(7, currBrightness, 0, currBrightness); //purple
   }
   //End Oil Pressure
 
@@ -100,10 +101,12 @@ void setLED() {
 
 
   //Set Oil Temp LED
-  //int oilTempRange[] = { 0 , 50 , 90 , 110 , 110 , 140};
+  //int oilTempRange[] = { 1 , 50 , 90 , 110 , 140};
   int currOilTemp = valueArray[oilTemp];
-  if ((currOilTemp < oilTempRange[1] ) ||  (currOilTemp > oilTempRange[5] )) {
+  if (currOilTemp <= oilTempRange[1] ||  currOilTemp >= oilTempRange[4]) {
     ShiftPWM.SetRGB(5, currBrightness, 0, 0); //red
+  } else if (currOilTemp >= oilTempRange[1] &&  currOilTemp <= oilTempRange[2] || currOilTemp >= oilTempRange[3] && currOilTemp <= oilTempRange[4] ) {
+  ShiftPWM.SetRGB(5, currBrightness, currBrightness, 0 ); //yellow
   } else if (currOilTemp >= oilTempRange[2] &&  currOilTemp <= oilTempRange[3]) {
     ShiftPWM.SetRGB(5, 0, currBrightness, 0); //green
   }
@@ -111,7 +114,7 @@ void setLED() {
 
 
   //Set Fuel Pressure LED
-  //int fuelPressureRange[] = {40, 150};
+  //int fuelPressureRange[] = {15, 40};
   int currFuelPress = valueArray[fuelPress];
   if ((currFuelPress < fuelPressureRange[0] ) ||  (currFuelPress > fuelPressureRange[1] )) {
     ShiftPWM.SetRGB(4, currBrightness, 0, 0); //red
@@ -159,7 +162,7 @@ void setLED() {
   //int egtRange[] = { 500, 800, 880};
   int currEGT = valueArray[EGT1];
   if ((currEGT <= egtRange[0]) ) {
-    ShiftPWM.SetRGB(0, currBrightness, currBrightness, 0); //yellow
+    ShiftPWM.SetRGB(0, currBrightness - 10, currBrightness, 0); //yellow
   } else  if ((currEGT >= egtRange[2]) ) {
     ShiftPWM.SetRGB(0, currBrightness, 0, 0); //red
   } else {
@@ -174,7 +177,10 @@ void readIncomingData(char ByteRead) {
   static byte dataPointer = 0;
   static byte dataBeginPointer = 0;
   if (ByteRead == '$') {
-    memset(valueArray, 0, sizeof(valueArray));
+    Serial.println("Array, Received!");
+
+    setLED();
+      memset(valueArray, 0, sizeof(valueArray));
     memset(dataArray, 0, sizeof(dataArray));
     dataBeginPointer = 0;
     dataPointer = 0;
