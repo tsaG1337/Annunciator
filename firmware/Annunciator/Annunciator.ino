@@ -47,7 +47,7 @@ TinyGPSCustom amps(motorStream, "ICMB912", 17);
 
 
 void setup() {
-  Serial.begin(230400);
+  Serial.begin(19200);
 
   //Init Shiftregisters
   ShiftPWM.SetAmountOfRegisters(numRegisters);
