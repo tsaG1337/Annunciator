@@ -1,3 +1,5 @@
+// Version 1.1
+
 #include <TinyGPS++.h>
 
 //*** ShiftPWM Setup ***//
@@ -10,20 +12,27 @@ unsigned char maxBrightness = 255;
 unsigned char pwmFrequency = 90;
 int numRegisters = 3;
 int numRGBleds = numRegisters * 8 / 3;
-int currBrightness = 128;
+int Brightness = 128;
+int green[3] = { 0, 128, 0};
+int yellow[3] = { 128, 64, 0};
+int red[3] = { 128, 0, 0};
+int blue[3] = { 0, 0, 128};
+
 
 //*** Definition of operational ranges ***//
 
-int rpmRange[] = {0, 1440, 1800, 5500, 5800, 5850};
-// Red_end , yellow_begin, green_begin, green_end, yellow_end, red_begin) (1/10 Bar)
 int oilPressRange[] = { 0 , 8 , 20 , 50 , 70};
-int oilTempRange[] = { 1 , 50 , 90 , 110 , 140};
-int egtRange[] = { 500, 800, 880};
-int CHTTempRange[] = {120, 150};
-int fuelPressureRange[] = {15, 40}; // ( 1/100 Bar)
-int fuelLHRange[] = {0, 200, 400};
-int fuelRHRange[] = {0, 200, 400};
-int voltsRange[] = {100, 140};
+int oilTempRange[] = { 0 , 50 , 110 , 130 , 150};
+int egtRange[] = { 850, 880, 1000};
+int CHTTempRange[] = {0, 120, 150};
+int fuelPressureRange[] = {0, 15, 50, 55}; // ( 1/100 Bar)
+int fuelLHRange[] = {0, 40, 100};
+int fuelRHRange[] = {0, 40, 100};
+int BatChargeRange[] = {10};  //If smaller than 1V -> green. Otherwise red.
+
+
+//TIMEOUT 3 SEC -< blau
+
 
 // The TinyGPS++ object
 TinyGPSPlus motorStream;
@@ -56,7 +65,7 @@ void setup() {
 
   //Set all LEDs to blue
   for (int led = 0; led < numRGBleds; led++) {
-    ShiftPWM.SetRGB(led, 0, 0, currBrightness); // blue
+    setLED(led, "blue");
   }
   //End init Shiftregisters
 
@@ -64,112 +73,154 @@ void setup() {
 
 
 void loop() { //SetLEDs Everytime a value is Updated.
-  if (RPM.isUpdated() || manPress.isUpdated() || oilPress.isUpdated() || fuelPress.isUpdated() || oilPress.isUpdated() || CHT1.isUpdated() || 
-  CHT2.isUpdated() || OAT.isUpdated() || fuelLH.isUpdated() || fuelRH.isUpdated() || fuelFlow.isUpdated() || fuelSum.isUpdated() || 
-  EGT1.isUpdated() || EGT2.isUpdated() || flaps.isUpdated() || volts.isUpdated() || amps.isUpdated() ) {
-    setLED();
+  if (oilPress.isUpdated()) {
+    setOilPress();
   }
-}
+  if (fuelPress.isUpdated()) {
+    setFuelPress();
+  }
+  if (oilTemp.isUpdated()) {
+    setOilTemp();
+  }
+  if (CHT1.isUpdated()) {
+    setCHTTemp();
+  }
+  if (fuelLH.isUpdated()) {
+    setFuelLH();
+  }
+  if (fuelRH.isUpdated()) {
+    setFuelRH();
+  }
+  if (volts.isUpdated()) {
+    setBatCharge();
+  }
+  if (EGT1.isUpdated()) {
+    setEGT();
+  }
 
-void serialEvent() {
   while (Serial.available() > 0) {
     motorStream.encode(Serial.read());
   }
 }
 
-void setLED() {
+void setOilPress() {
   //Set Oil Pressure LED
-  //int oilPressRange[] = { 0 , 8 , 20 , 50 , 70};
-  int currOilPress = oilPress.value();
-  if (currOilPress <= oilPressRange[1] ||  currOilPress >= oilPressRange[4]) {
-    ShiftPWM.SetRGB(7, currBrightness, 0, 0); //red
+  int currOilPress = atoi(oilPress.value());
+  if (currOilPress <= oilPressRange[1]) {
+    setLED(7, "red");
   } else if (currOilPress >= oilPressRange[1] &&  currOilPress <= oilPressRange[2]) {
-    ShiftPWM.SetRGB(7, currBrightness, currBrightness, 0 ); //yellow
+    setLED(7, "yellow");
   } else if (currOilPress >= oilPressRange[2] &&  currOilPress <= oilPressRange[3]) {
-    ShiftPWM.SetRGB(7, 0, currBrightness, 0); //green
+    setLED(7, "green");
+  } else if (currOilPress >= oilPressRange[4] && currOilPress <= oilPressRange[5]) {
+    setLED(7, "yellow");
   }
   //End Oil Pressure
 
-
+}
+void setFuelLH() {
   //Set Fuel LH LED
-  //int fuelLHRange[] = {0, 200, 400};
-  int currfuelLH = fuelLH.value();
+  int currfuelLH = atoi(fuelLH.value());
   if (currfuelLH <= fuelLHRange[1] ) {
-    ShiftPWM.SetRGB(6, currBrightness, 0, 0); //red
-  } else  {
-    ShiftPWM.SetRGB(6, 0, currBrightness, 0); //green
+    setLED(6, "red");
+  } else if (currfuelLH <= fuelLHRange[2] ) {
+    setLED(6, "yellow");
+  } else if (currfuelLH >= fuelLHRange[2] ) {
+    setLED(6, "green");
   }
   //End Fuel LH
+}
 
-
-  //Set Oil Temp LED
-  //int oilTempRange[] = { 1 , 50 , 90 , 110 , 140};
-  int currOilTemp = oilTemp.value();
-  if (currOilTemp <= oilTempRange[1] ||  currOilTemp >= oilTempRange[4]) {
-    ShiftPWM.SetRGB(5, currBrightness, 0, 0); //red
-  } else if (currOilTemp >= oilTempRange[1] &&  currOilTemp <= oilTempRange[2] || currOilTemp >= oilTempRange[3] && currOilTemp <= oilTempRange[4] ) {
-    ShiftPWM.SetRGB(5, currBrightness, currBrightness, 0 ); //yellow
-  } else if (currOilTemp >= oilTempRange[2] &&  currOilTemp <= oilTempRange[3]) {
-    ShiftPWM.SetRGB(5, 0, currBrightness, 0); //green
-  }
-  //End Oil Temp
-
-
-  //Set Fuel Pressure LED
-  //int fuelPressureRange[] = {15, 40};
-  int currFuelPress = fuelPress.value();
-  if ((currFuelPress < fuelPressureRange[0] ) ||  (currFuelPress > fuelPressureRange[1] )) {
-    ShiftPWM.SetRGB(4, currBrightness, 0, 0); //red
-  } else if (currFuelPress >= fuelPressureRange[0] &&  currFuelPress <= fuelPressureRange[1]) {
-    ShiftPWM.SetRGB(4, 0, currBrightness, 0); //green
-  }
-  //End Fuel Pressure
-
-
-  //Set Volts LED
-  //int voltsRange[] = {100,140};
-  //int currVolts = valueArray[volts];
-  int currVolts = volts.value();
-  Serial.println(currVolts);
-  if ((currVolts < voltsRange[0] ) ||  (currVolts > voltsRange[1] )) {
-    ShiftPWM.SetRGB(3, currBrightness, 0, 0); //red
-  } else if (currVolts >= voltsRange[0]  || currVolts <= voltsRange[1]) {
-    ShiftPWM.SetRGB(3, 0, currBrightness, 0); //green
-  }
-  //End Volts
-
-
-  //Set CHT Temp LED
-  //int CHTTempRange[] = {60, 150};
-  int currCHTTemp = CHT1.value();
-  if ((currCHTTemp < CHTTempRange[0] ) ||  (currCHTTemp > CHTTempRange[1] )) {
-    ShiftPWM.SetRGB(2, currBrightness, 0, 0); //red
-  } else if (currCHTTemp >= CHTTempRange[0] &&  currCHTTemp <= CHTTempRange[1]) {
-    ShiftPWM.SetRGB(2, 0, currBrightness, 0); //green
-  }
-  //End CHT Temp
-
+void setFuelRH() {
 
   //Set Fuel RH LED
-  //int fuelRHRange[] = {0, 200, 400};
-  int currfuelRH = fuelRH.value();
+  int currfuelRH = atoi(fuelRH.value());
   if (currfuelRH <= fuelRHRange[1] ) {
-    ShiftPWM.SetRGB(1, currBrightness, 0, 0); //red
-  } else  {
-    ShiftPWM.SetRGB(1, 0, currBrightness, 0); //green
+    setLED(1, "red");
+  } else if (currfuelRH <= fuelRHRange[2] ) {
+    setLED(1, "yellow");
+  } else if (currfuelRH >= fuelRHRange[2] ) {
+    setLED(1, "green");
   }
   //End Fuel RH
+}
+void setOilTemp() {
 
+  //Set Oil Temp LED
+  int currOilTemp = atoi(oilTemp.value());
+  if (currOilTemp <= oilTempRange[1]) {
+    setLED(5, "yellow");
+  } else if (currOilTemp >= oilTempRange[1] &&  currOilTemp <= oilTempRange[2] ) {
+    setLED(5, "green");
+  } else if (currOilTemp >= oilTempRange[2] &&  currOilTemp <= oilTempRange[3]) {
+    setLED(5, "yellow");
+  } else if (currOilTemp >= oilTempRange[3] &&  currOilTemp <= oilTempRange[4]) {
+    setLED(5, "red");
+  }
+  //End Oil Temp
+}
+void setFuelPress() {
 
+  //Set Fuel Pressure LED
+  int currFuelPress = atoi(fuelPress.value());
+  if (currFuelPress < fuelPressureRange[1] ) {
+    setLED(4, "red");
+  } else if (currFuelPress >= fuelPressureRange[1] &&  currFuelPress <= fuelPressureRange[2]) {
+    setLED(4, "green");
+  } else if ((currFuelPress >= fuelPressureRange[4] && currFuelPress <= fuelPressureRange[3] )) {
+    setLED(4, "red");
+  }
+  //End Fuel Pressure
+}
+
+void setBatCharge() {
+  //Set Volts LED
+  int currCharge = atoi(amps.value());
+  Serial.println(currCharge);
+  if ((currCharge < BatChargeRange[0] )) {
+    setLED(3, "red");
+  } else if (currCharge >= BatChargeRange[0]  || currCharge <= BatChargeRange[1]) {
+    setLED(3, "green");
+  }
+  //End Volts
+}
+
+void setCHTTemp() {
+
+  //Set CHT Temp LED
+  int currCHTTemp = atoi(CHT1.value());
+  if ((currCHTTemp <= CHTTempRange[2] ) &&  (currCHTTemp >= CHTTempRange[1] )) {
+    setLED(2, "red");
+  } else if (currCHTTemp <= CHTTempRange[1]) {
+    setLED(2, "green");
+  }
+  //End CHT Temp
+}
+
+void setEGT() {
   //Set EGT LED
-  //int egtRange[] = { 500, 800, 880};
-  int currEGT = EGT1.value();
+  char currEGT = atoi(EGT1.value());
   if ((currEGT <= egtRange[0]) ) {
-    ShiftPWM.SetRGB(0, currBrightness, currBrightness, 0); //yellow
-  } else  if ((currEGT >= egtRange[2]) ) {
-    ShiftPWM.SetRGB(0, currBrightness, 0, 0); //red
-  } else {
-    ShiftPWM.SetRGB(0, 0, currBrightness, 0); //green
+    setLED(0, "green");
+  } else  if ((currEGT >= egtRange[0]) && (currEGT <= egtRange[1]) ) {
+    setLED(0, "yellow");
+  } else if ((currEGT >= egtRange[1]) && (currEGT <= egtRange[2]) ) {
+    setLED(0, "red");
   }
   //End EGT
+}
+
+
+void setLED(int LEDNumber, String color) {
+  if (color == "red") {
+    ShiftPWM.SetRGB(LEDNumber, red[0], red[1], red[2]);           //red
+  } else if (color == "yellow") {
+    ShiftPWM.SetRGB(LEDNumber, yellow[0], yellow[1], yellow[2]);  //yellow
+  } else if (color == "green") {
+    ShiftPWM.SetRGB(LEDNumber, green[0], green[1], green[2]);     //green
+  } else if (color == "blue") {
+    ShiftPWM.SetRGB(LEDNumber, blue[0], blue[1], blue[2]);     //blue
+  } else if (color == "off") {
+    ShiftPWM.SetRGB(LEDNumber, 0, 0, 0);     //off
+  }
 }
